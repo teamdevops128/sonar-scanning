@@ -1,0 +1,26 @@
+trigger:
+- main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  SONAR_TOKEN: $(SONAR_TOKEN)
+
+steps:
+- script: |
+    echo "Starting SonarCloud Analysis"
+    wget -q -O sonar-scanner-cli.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.6.2.2472-linux.zip
+    unzip -q sonar-scanner-cli.zip
+    export PATH=$PATH:$(pwd)/sonar-scanner-4.6.2.2472-linux/bin
+    sonar-scanner \
+      -Dsonar.projectKey=your-sonar-project-key \
+      -Dsonar.organization=your-sonarcloud-organization \
+      -Dsonar.sources=. \
+      -Dsonar.host.url=https://sonarcloud.io \
+      -Dsonar.login=$SONAR_TOKEN
+  displayName: 'Run SonarCloud Analysis with Bash'
+
+- task: SonarCloudPublish@1
+  inputs:
+    pollingTimeoutSec: '300'
