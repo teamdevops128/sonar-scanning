@@ -1,0 +1,71 @@
+#!/bin/bash
+
+# Define variables
+SONARCLOUD_ORG="<your-organization-key>"
+API_TOKEN="<your-api-token>"
+BASE_URL="https://sonarcloud.io/api/projects/search"
+ANALYSIS_URL="https://sonarcloud.io/api/project_analyses/search"
+OUTPUT_FILE="sonar_projects_execution_status.csv"
+
+# Initialize variables
+page=1
+pageSize=100
+total=0
+projects_with_executions=0
+projects_without_executions=0
+
+# Write CSV header
+echo "Key,Name,Visibility,Organization,Has Executions" > $OUTPUT_FILE
+
+# Function to fetch projects
+fetch_projects() {
+  local page=$1
+  response=$(curl -s -u $API_TOKEN: "$BASE_URL?organization=$SONARCLOUD_ORG&p=$page&ps=$pageSize")
+  echo "$response"
+}
+
+# Function to check if project has executions
+check_executions() {
+  local project_key=$1
+  response=$(curl -s -u $API_TOKEN: "$ANALYSIS_URL?project=$project_key&ps=1")
+  analysis_count=$(echo $response | jq '.analyses | length')
+  if [ $analysis_count -gt 0 ]; then
+    echo "Yes"
+  else
+    echo "No"
+  fi
+}
+
+# Fetch initial page to get total number of pages
+response=$(fetch_projects $page)
+total=$(echo $response | jq '.paging.total')
+pages=$(echo "($total + $pageSize - 1) / $pageSize" | bc)
+
+# Iterate over all pages
+for ((page=1; page<=pages; page++)); do
+  response=$(fetch_projects $page)
+  
+  # Extract projects and check for executions
+  projects=$(echo $response | jq -c '.components[]')
+  for project in $projects; do
+    key=$(echo $project | jq -r '.key')
+    name=$(echo $project | jq -r '.name')
+    visibility=$(echo $project | jq -r '.visibility')
+    organization=$(echo $project | jq -r '.organization')
+    has_executions=$(check_executions $key)
+    
+    # Update counts
+    if [ "$has_executions" == "Yes" ]; then
+      ((projects_with_executions++))
+    else
+      ((projects_without_executions++))
+    fi
+
+    # Write to CSV
+    echo "$key,$name,$visibility,$organization,$has_executions" >> $OUTPUT_FILE
+  done
+done
+
+echo "Projects with executions: $projects_with_executions"
+echo "Projects without executions: $projects_without_executions"
+echo "Project execution status has been exported to $OUTPUT_FILE"
