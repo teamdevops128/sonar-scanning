@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# Define variables
+SONARCLOUD_ORG="<your-organization-key>"
+API_TOKEN="<your-api-token>"
+BASE_URL="https://sonarcloud.io/api/projects/search"
+OUTPUT_FILE="sonar_projects.csv"
+
+# Initialize variables
+page=1
+pageSize=100
+total=0
+
+# Write CSV header
+echo "Key,Name,Visibility,Organization" > $OUTPUT_FILE
+
+# Function to fetch projects
+fetch_projects() {
+  local page=$1
+  response=$(curl -s -u $API_TOKEN: "$BASE_URL?organization=$SONARCLOUD_ORG&p=$page&ps=$pageSize")
+  echo "$response"
+}
+
+# Fetch initial page to get total number of pages
+response=$(fetch_projects $page)
+total=$(echo $response | jq '.paging.total')
+pages=$(echo "($total + $pageSize - 1) / $pageSize" | bc)
+
+# Iterate over all pages
+for ((page=1; page<=pages; page++)); do
+  response=$(fetch_projects $page)
+  
+  # Extract and print projects to CSV
+  echo $response | jq -r '.components[] | [.key, .name, .visibility, .organization] | @csv' >> $OUTPUT_FILE
+done
+
+echo "Projects have been exported to $OUTPUT_FILE"
